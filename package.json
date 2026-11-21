@@ -1,0 +1,19 @@
+{
+  "name": "shupu",
+  "version": "1.0.0",
+  "license": "Apache-2.0",
+  "private": true,
+  "type": "module",
+  "main": "desktop.cjs",
+  "scripts": {
+    "build": "tsc && node bundle.mjs",
+    "desktop:install": "install-electron",
+    "start": "npm run build && electron .",
+    "preview": "npm run build && node preview.mjs",
+    "test": "npm run build && node --test tests/*.test.mjs"
+  },
+  "devDependencies": {
+    "electron": "45.3.4",
+    "typescript": "~5.9.3"
+  }
+}

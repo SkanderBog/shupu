@@ -1,0 +1,781 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' blob: data:; object-src 'none'; base-uri 'none'">
+  <title>数谱 | 简谱工作台</title>
+  <link rel="stylesheet" href="./styles.css">
+  <script type="module" src="./dist/app.js"></script>
+</head>
+<body>
+  <header class="masthead">
+    <div class="identity"><strong>数谱</strong></div>
+    <nav class="menu-bar" aria-label="主菜单">
+      <details data-menu="file"><summary>文件</summary><div class="menu-items">
+        <button id="new">新建乐谱</button><button id="open">打开工程…</button><button id="import">导入 MusicXML…</button>
+        <button id="sample">打开样谱</button><button data-command="voices">声部设置…</button><button data-command="save">保存工程</button>
+        <button data-command="save-as">另存为…</button><button data-command="duplicate-document">生成副本</button>
+        <button data-command="export-xml">导出 MusicXML</button><button data-command="print">导出…</button>
+        <button data-command="linked-parts">关联分谱…</button>
+      </div></details>
+      <details data-menu="edit"><summary>编辑</summary><div class="menu-items">
+        <button data-command="undo">撤销 <kbd>Ctrl Z</kbd></button><button data-command="redo">重做 <kbd>Ctrl Shift Z</kbd></button>
+        <button data-command="copy">复制 <kbd>Ctrl C</kbd></button><button data-command="cut">剪切 <kbd>Ctrl X</kbd></button><button data-command="paste">粘贴 <kbd>Ctrl V</kbd></button>
+        <button data-command="copy-structure">复制整小节和调拍反复</button>
+        <button data-command="select-similar">选择相似元素…</button><button data-command="copy-lyric-text">复制歌词为纯文本…</button>
+        <button data-command="lyric-preview">歌词配位预览…</button>
+        <button data-command="split-chords">叠音拆成独立声部…</button><button data-command="merge-voices">独立声部合为叠音…</button>
+        <div class="menu-branch">
+          <button type="button" class="submenu-trigger" aria-haspopup="true" aria-controls="swap-voice-menu">交换临时声部 <span aria-hidden="true">▸</span></button>
+          <div id="swap-voice-menu" class="menu-items submenu-items">
+            <button data-command="swap-voices:1:2">交换 1、2 声部</button>
+            <button data-command="swap-voices:1:3">交换 1、3 声部</button>
+            <button data-command="swap-voices:2:3">交换 2、3 声部</button>
+            <button data-command="swap-voices:custom">自定义交换声部…</button>
+          </div>
+        </div>
+        <button data-command="delete">删除所选 <kbd>Del</kbd></button><button data-command="lyric-edit">谱面填词 <kbd>L</kbd></button>
+        <button data-command="shortcut-settings">快捷键设置…</button>
+        <button data-command="preferences">偏好设置…</button>
+      </div></details>
+      <details data-menu="view"><summary>视图</summary><div class="menu-items">
+        <button data-command="palette">符号面板</button><button data-command="layout">版面面板</button><button data-command="properties">属性面板</button>
+        <button data-command="sidebar">显示／隐藏左栏</button><button data-command="mixer">混音台</button>
+        <button data-command="fit">适应页面</button><button data-command="fullscreen">全屏 <kbd>F11</kbd></button>
+      </div></details>
+      <details data-menu="add"><summary>添加</summary><div class="menu-items">
+        <button data-command="search">搜索符号 <kbd>Ctrl K</kbd></button><button data-command="lane-add">常设声部</button>
+        <button data-command="side-add">临时声部</button><button data-command="lyric-edit">歌词</button>
+        <button data-command="chord-symbol">和弦代号…</button><button data-command="route-mark">Segno 返回点</button>
+      </div></details>
+      <details data-menu="format"><summary>格式</summary><div class="menu-items">
+        <button data-command="page-layout">样式…</button><button data-command="justify-bottom">全谱页底对齐</button>
+        <button data-command="score-navigation">小节导航与校对…</button><button data-command="line-layout">换行规则…</button>
+        <button data-command="line-lock">锁定当前谱行或选段</button><button data-command="line-unlock">解除选区锁行</button>
+        <button data-command="line-section-clear">清除选区换行规则</button>
+        <button data-command="side-split">在此音后切分临时声部段</button>
+        <button data-command="break:line">在此换行</button><button data-command="break:page">在此换页</button><button data-command="break:auto">取消手动断行</button>
+        <button data-command="reset-spacing">恢复全谱默认间距</button>
+      </div></details>
+      <details data-menu="help"><summary>帮助</summary><div class="menu-items">
+        <button data-command="help">入门使用</button><button data-command="manual">功能手册</button>
+        <button data-command="shortcut-settings">快捷键设置…</button>
+        <button data-command="preferences">偏好设置…</button>
+        <button data-command="about">关于</button>
+      </div></details>
+    </nav>
+    <div class="file-actions">
+      <button data-command="import" title="导入 MusicXML">导入</button><button id="save" title="保存可继续编辑的数谱工程 · Ctrl+S">保存工程</button>
+      <button id="print" class="primary">导出…</button>
+    </div>
+    <input id="file" type="file" accept=".shupu,.json,application/json" hidden>
+    <input id="music-file" type="file" accept=".musicxml,.xml,.mxl" hidden>
+  </header>
+<div class="toolbar" aria-label="记谱与播放"><div class="notation-controls">
+        <div class="tool-group" role="group" aria-label="编辑模式">
+          <button id="show-sidebar" title="显示左栏" aria-label="显示左栏" hidden>☰</button>
+          <button id="input-mode" title="N：切换；Esc：返回常规编辑">音符输入(N)</button>
+        </div>
+        <div class="tool-group" role="group" aria-label="音符时值">
+          <div id="values" class="tool-choices"></div>
+          <button id="toolbar-tuplet" data-command="tuplet:custom" title="多连音（Ctrl+0）" aria-label="多连音">多连音</button>
+        </div>
+        <div id="dots" class="tool-group" role="group" aria-label="附点"></div>
+        <div id="octaves" class="tool-group" role="group" aria-label="八度"></div>
+        <div id="alter" class="tool-group" role="group" aria-label="升降还原"></div>
+        <div class="tool-group quick-markings" role="group" aria-label="叠音、连线与歌词">
+          <button id="chord" title="叠音（C）" aria-label="叠音">叠音</button>
+          <button id="toolbar-tie" data-command="tie" title="同音线（Enter）" aria-label="同音线">同音线</button>
+          <button id="toolbar-slur" data-command="slur" title="连音线（+）" aria-label="连音线">连音线</button>
+          <button data-command="lyric-edit" title="谱面填词（L）" aria-label="谱面填词">词</button>
+        </div>
+        <div class="tool-group" role="group" aria-label="撤销与重做"><button id="undo" title="撤销（Ctrl+Z）" aria-label="撤销">撤销</button><button id="redo" title="重做（Ctrl+Shift+Z）" aria-label="重做">重做</button></div>
+</div><div class="transport" aria-label="播放">
+        <button id="rewind" type="button" aria-label="返回起点"></button>
+        <button id="play" type="button" aria-label="播放" aria-keyshortcuts="Space"></button><button id="stop" type="button" aria-label="回位" aria-keyshortcuts="Tab"></button>
+        <button id="hear-one" type="button" aria-pressed="false" title="仅试听所选声部，沿用混音台的设置" aria-label="仅听所选声部">独</button>
+        <button id="mixer" type="button" aria-expanded="false" aria-label="混音台"></button>
+        <input type="checkbox" id="play-click" hidden><button id="metronome-toggle" type="button" aria-label="节拍器" aria-pressed="false"></button>
+        <input type="checkbox" id="loop" hidden><button id="loop-toggle" type="button" aria-label="循环" aria-pressed="false"></button>
+        <details class="play-options" data-menu="play-options"><summary id="play-settings-icon" aria-label="播放设置" title="播放设置"></summary><div class="menu-items">
+          <label>试听速度<select id="speed"><option value=".5">50%</option><option value=".65">65%</option><option value=".8">80%</option><option value="1" selected>100%</option><option value="1.15">115%</option><option value="1.3">130%</option></select></label>
+          <label>预备拍<select id="count-in"><option value="0">无</option><option value="1">一小节</option><option value="2">两小节</option></select></label>
+          <label>节拍器音量<input id="click-level" type="range" min="0" max="100" value="55" aria-label="节拍器音量"></label>
+          <label><input type="checkbox" id="click-subdivide">播放细分拍</label>
+          <label title="按小节在谱中的顺序填写；若有弱起，弱起是第 1 个小节">循环起点<input id="loop-from" type="number" min="1"></label>
+          <label title="按小节在谱中的顺序填写">循环终点<input id="loop-to" type="number" min="1"></label>
+        </div></details>
+</div></div>
+  <div class="workspace">
+    <aside class="sidebar" id="sidebar" aria-label="乐谱面板">
+      <div class="panel-tabs" role="tablist" aria-label="侧栏">
+        <button id="tab-palette" role="tab" aria-controls="panel-palette" data-panel="palette">符号面板</button>
+        <button id="tab-layout" role="tab" aria-controls="panel-layout" data-panel="layout">版面</button>
+        <button id="tab-properties" role="tab" aria-controls="panel-properties" data-panel="properties">属性</button>
+        <button id="hide-sidebar" title="隐藏左栏" aria-label="隐藏左栏">‹</button>
+      </div>
+      <div class="panel-body" id="panel-palette" role="tabpanel" aria-labelledby="tab-palette">
+        <label class="palette-search"><span class="sr-only">搜索符号</span><input id="palette-query" type="search" placeholder="搜索符号，如渐弱、换气" autocomplete="off"><kbd>Ctrl K</kbd></label>
+        <div id="palette-groups"></div>
+        <p id="palette-empty" class="empty-copy" hidden>没有匹配的符号，试试其他关键词。</p>
+        <div id="palette-actions" hidden>
+          <button id="staccato">顿音</button><button id="accent">重音</button><button id="fermata">延长</button>
+          <button id="tenuto">保持音</button><button id="breath">V 形换气</button><button id="breath-comma">逗号换气</button>
+          <button id="lyric-edit">谱面填词</button><button id="lyric-extension">歌词延长线</button>
+        </div>
+      </div>
+      <div class="panel-body" id="panel-layout" role="tabpanel" aria-labelledby="tab-layout" hidden>
+
+      <section id="system-voices" hidden>
+        <div class="section-title">声部<button id="open-system-voices" type="button">声部设置</button></div>
+        <p class="layout-help" id="system-voices-location"></p>
+        <div id="system-voice-options"></div>
+        <p class="layout-help" id="system-layout-notice" hidden></p>
+        <div id="system-bracket-conflicts" hidden></div>
+        <button id="system-voices-reset" type="button">恢复本行默认显隐</button>
+      </section>
+      <section>
+        <button data-command="page-layout">样式…</button><button data-command="measure-edit">小节属性…</button>
+        <div class="buttons layout-break"><button data-command="break:line">换行</button><button data-command="break:page">换页</button><button data-command="break:auto">取消断行</button></div>
+      </section>
+
+      <section>
+        <details id="notices" hidden><summary id="notice-count">导入提示</summary><div id="notice-list"></div></details>
+      </section>
+      </div>
+      <div class="panel-body" id="panel-properties" role="tabpanel" aria-labelledby="tab-properties" hidden>
+        <p id="part-property-scope" class="layout-help" hidden>谱面内容与主谱联动。位置和样式仅应用于本分谱。</p>
+      <div class="panel-intro"><h2 id="object-name">属性</h2><p id="object-location"></p></div>
+        <section id="appearance-properties" hidden>
+          <label id="courtesy-accidental-row" class="check-option" hidden><input id="courtesy-accidental" type="checkbox">强制显示升降号</label>
+          <label id="rhythm-alignment-row" hidden>声部对齐<select id="rhythm-alignment"><option value="auto">自动</option><option value="full">完全对齐</option><option value="half">半对齐</option><option value="none">不对齐</option></select></label>
+          <label class="check-option"><input id="element-visible" type="checkbox">可见（关闭后不印刷）</label>
+          <label class="check-option" id="element-layout-label"><input id="element-layout" type="checkbox">参与排版</label>
+          <button id="reset-placement" type="button">恢复自动位置</button>
+          <button id="show-voice-settings" type="button" hidden>前往声部设置…</button>
+          <button id="show-number-settings" type="button" hidden>前往小节号样式…</button>
+          <label class="check-option" id="independent-name-label" hidden><input id="independent-name" type="checkbox">此处独立编辑简称</label>
+          <label class="check-option" id="independent-name-position-label" hidden><input id="independent-name-position" type="checkbox">此处独立编辑位置</label>
+        </section>
+      <section id="staff-bracket-properties" hidden>
+        <label>样式<select id="staff-bracket-type"><option value="bracket">粗括号</option><option value="brace">花括号</option><option value="square">细方括号</option></select></label>
+        <label>上端声部<select id="staff-bracket-top"></select></label>
+        <label>下端声部<select id="staff-bracket-bottom"></select></label>
+        <label class="check-option"><input id="staff-bracket-sync" type="checkbox">全谱同步</label>
+        <button id="staff-bracket-delete" type="button">删除连谱号</button>
+      </section>
+      <section id="note-properties">
+        <div class="section-title">歌词与记号</div>
+        <div data-property="lyric">
+          <div class="row"><label>歌词段<input id="verse" type="number" min="1" max="20" value="1"></label><label>歌词<input id="lyric" maxlength="40"></label></div>
+          <div class="buttons"><button data-command="lyric-edit" title="L">谱面填词</button><button data-command="lyric-extension">歌词延长线</button></div>
+        </div>
+        <label data-property="dynamic">力度<input id="dynamic" maxlength="10" placeholder="mp"></label>
+        <label data-property="text">表情文字<input id="expression" maxlength="30" placeholder="solo"></label>
+        <label data-property="interNoteText" data-selected-mark>音符间文字<input id="inter-note-text" maxlength="300"></label>
+        <label data-property="interNoteText" data-selected-mark>位置<select id="inter-note-side"><option value="left">音符左侧</option><option value="right">音符右侧</option></select></label>
+        <label data-property="rehearsal">排练标记<input id="rehearsal" maxlength="20" placeholder="A"></label>
+        <label data-property="beam">减时线属性<select id="beam-options"></select></label>
+      </section>
+      <label id="arc-shape-label" hidden>弧形<select id="arc-shape"><option value="auto">自动</option><option value="long">长弧</option><option value="short">短弧</option></select></label>
+      <section id="span-edit" hidden>
+          <dl id="span-positions" class="endpoint-list"></dl>
+          <label id="lyric-flow-label">歌词导航<select id="lyric-flow"><option value="auto">自动</option><option value="each">逐音</option><option value="first">只停首音</option></select></label>
+          <label>调整线条端点<select id="endpoint"><option value="to">终点</option><option value="from">起点</option></select></label>
+          <div class="buttons"><button id="span-left">← 前移</button><button id="span-right">后移 →</button><button id="element-delete">删除</button></div>
+      </section>
+      <section id="ornament-properties" hidden>
+        <h2>装饰音与震音</h2>
+        <label id="ornament-upper-row">上辅助音<select id="ornament-upper"><option value="">随调与本小节</option><option value="-2">重降</option><option value="-1">降</option><option value="0">还原</option><option value="1">升</option><option value="2">重升</option></select></label>
+        <label id="ornament-lower-row">下辅助音<select id="ornament-lower"><option value="">随调与本小节</option><option value="-2">重降</option><option value="-1">降</option><option value="0">还原</option><option value="1">升</option><option value="2">重升</option></select></label>
+        <label id="ornament-strokes-row">震音线数<select id="ornament-strokes"><option>1</option><option>2</option><option>3</option></select></label>
+        <label id="ornament-fromUpper-row"><input id="ornament-fromUpper" type="checkbox">从上辅助音开始</label>
+        <label id="ornament-wave-row"><input id="ornament-wave" type="checkbox">显示延续波线</label>
+        <label id="ornament-delayed-row"><input id="ornament-delayed" type="checkbox">延后回音</label>
+      </section>
+      <section id="measure-properties">
+        <button id="show-measure-settings" data-command="measure-edit" type="button" hidden>小节属性…</button>
+        <details id="repeat-tools"><summary>小节 · 反复与房子</summary>
+          <label>选段房子遍数<input id="ending-passes" placeholder="如 1 或 2,3" maxlength="20"></label>
+          <div id="ending-properties" hidden>
+            <p id="ending-anchor-description" class="layout-help"></p>
+            <div class="row" id="ending-range-fields"><label>起小节序号<input id="ending-from" type="number" min="1"></label><label>止小节序号<input id="ending-to" type="number" min="1"></label></div>
+            <label class="check-option"><input id="ending-open" type="checkbox">右端开放</label>
+          </div>
+          <div class="buttons"><button id="ending-set">设房子</button><button id="ending-clear">删房子</button></div>
+        </details>
+      </section>
+      <section id="boundary-properties" hidden>
+        <label>小节线样式<select id="bar-options"></select></label>
+        <label id="repeat-times-label">再反复几遍<input id="repeat-times" type="number" min="0" max="7" value="0"></label>
+        <label id="boundary-break-label">边界排版<select id="break-options"><option value="mixed" disabled>混合</option><option value="auto">自动</option><option value="line">换行</option><option value="page">换页</option></select></label>
+      </section>
+      <section id="text-properties" hidden>
+        <div id="text-format"></div>
+        <button data-command="edit-element">在谱面编辑</button><button data-command="delete">删除所选</button>
+      </section>
+      <section id="breath-properties" hidden>
+        <label>换气形状<select id="breath-shape"><option value="upbow">V 形</option><option value="comma">逗号</option><option value="tick">短划</option><option value="salzedo">萨尔塞多式</option></select></label>
+      </section>
+      <section id="title-properties" hidden>
+        <div class="section-title">标题区</div>
+        <label>标题<input id="title" maxlength="100" autocomplete="off"></label>
+        <label>署名<input id="credit" maxlength="100" autocomplete="off"></label>
+        <div>
+          <label>副标题<input id="subtitle" maxlength="100"></label>
+          <label>作词<input id="lyricist" maxlength="100"></label>
+          <label>作曲<input id="composer" maxlength="100"></label><label>改编<input id="arranger" maxlength="100"></label><label>版权<input id="copyright" maxlength="100"></label>
+        </div>
+        <details><summary id="title-key-summary"></summary><div id="title-key-fields"></div></details><details><summary id="title-meter-summary"></summary><div id="title-meter-fields"></div></details><details><summary id="title-tempo-summary"></summary><div id="title-tempo-fields"></div></details>
+      </section>
+      <section id="signature-properties" hidden></section>
+      <button id="side-split-property" data-command="side-split" hidden>在此音后切分临时声部段</button>
+      <label id="playback-property" class="check-option" hidden><input id="mark-playback" type="checkbox">影响播放</label>
+      <section id="dynamic-properties" hidden>
+        <label class="check-option"><input id="align-dynamics" type="checkbox">与相邻力度对齐</label>
+        <label id="dynamic-line-text-row">谱面文字<input id="dynamic-line-text" maxlength="300"></label>
+        <label id="dynamic-line-target-row">渐变目标<select id="dynamic-line-target"></select></label>
+      </section>
+      <section id="route-properties" hidden><h3>跳转与尾声</h3>
+        <div class="row">
+          <label>记号<select id="route-kind"><option value="segno">Segno · 返回点</option><option value="coda">Coda · 尾声起点</option><option value="dc">D.C. · 从头再奏</option><option value="ds">D.S. · 返回 Segno</option><option value="tocoda">To Coda · 转入尾声</option><option value="fine">Fine · 结束点</option></select></label>
+          <label id="route-target-row">目标编号或名称<input id="route-target" maxlength="40" value="1" required></label>
+        </div>
+        <div id="route-return">
+          <label>返回后<select id="route-until"><option value="">继续演奏</option><option value="fine">演奏至 Fine</option><option value="coda">遇 To Coda 时转入尾声</option></select></label>
+          <label class="check-option"><input id="route-repeat" type="checkbox">返回后仍执行小节反复</label>
+        </div>
+      </section>
+      <section id="chord-properties" hidden><h3>和弦代号</h3><p id="chord-recognition" class="layout-help"></p><label>实际和弦（留空时使用谱面文字）<input id="chord-actual" maxlength="80"></label></section>
+      <section id="tempo-mark-properties" hidden>
+        <div class="section-title">速度记号</div>
+        <p id="tempo-current" class="layout-help"></p>
+        <div id="tempo-metronome-fields">
+          <label>节拍单位<select id="tempo-unit"></select></label>
+          <label>附点<select id="tempo-dots"><option value="0">无附点</option><option value="1">单附点</option><option value="2">双附点</option></select></label>
+          <label id="tempo-written-field">谱面速度<input id="tempo-written" type="number" min=".01" max="1200" step="any"></label>
+        </div>
+        <div id="tempo-modulation-fields">
+          <label>等号右侧时值<select id="tempo-right-unit"></select></label>
+          <label>右侧附点<select id="tempo-right-dots"><option value="0">无附点</option><option value="1">单附点</option><option value="2">双附点</option></select></label>
+        </div>
+        <div id="tempo-swing-fields">
+          <label>摇摆单位<select id="tempo-swing-unit"><option value="48">八分音符</option><option value="24">十六分音符</option></select></label>
+          <label>长短比<input id="tempo-ratio" type="number" min="1" max="4" step="any"></label>
+        </div>
+        <label id="tempo-caption-field">谱面文字<input id="tempo-caption" maxlength="80"></label>
+        <label id="tempo-override-field">实际速度覆盖（四分音符每分钟）<input id="tempo-override" type="number" min=".01" max="1200" step="any" placeholder="空白为自动"></label>
+      </section>
+      <section id="tempo-line-properties" hidden>
+        <div class="section-title">渐变速度</div>
+        <p id="tempo-line-range" class="layout-help"></p>
+        <label>谱面文字<input id="tempo-line-caption" maxlength="80"></label>
+        <label>目标速度方式<select id="tempo-line-mode"><option value="percent">起始速度的百分比</option><option value="target">指定实际 BPM（四分音符）</option></select></label>
+        <label>目标值<input id="tempo-line-value" type="number" min=".01" max="1200" step="any"></label>
+        <label class="check-option"><input id="tempo-dash-visible" type="checkbox">延伸虚线可见</label>
+        <label class="check-option"><input id="tempo-line-playback" type="checkbox">影响播放</label>
+        <label class="check-option"><input id="tempo-dash-layout" type="checkbox">延伸虚线参与排版</label>
+      </section>
+      </div>
+    </aside>
+    <main>
+  
+      <div class="document-strip" id="document-strip" aria-label="打开的乐谱"></div>
+      <div class="desk" id="desk" tabindex="0" aria-label="可编辑简谱，按 1 到 7 输入音符，0 输入休止，X 输入节奏音符">
+        <div id="score"></div>
+      </div>
+      <input id="inline-editor" hidden aria-label="谱面文字编辑" autocomplete="off" spellcheck="false">
+      <div id="inline-format" class="floating-format" aria-label="文字格式" hidden></div>
+      <footer>
+        <span id="status" role="status">正在启动。若一直停在这里，请用 Chrome 或 Edge 直接打开离线试用文件。</span>
+        <span id="chord-warning" aria-live="polite"></span>
+        <span id="play-status" hidden><output id="playing" aria-live="off"></output><span id="transport-tempo"></span></span><span id="page-count"></span>
+        <select id="page-view" aria-label="页面视图"><option value="single">单列</option><option value="spread" selected>并排</option><option value="horizontal">横排</option></select>
+        <button id="zoom-out" aria-label="缩小">−</button><div class="zoom-field"><input id="zoom-readout" type="text" inputmode="decimal" value="100%" aria-label="缩放百分比"><details id="zoom-presets"><summary aria-label="缩放预设" title="缩放预设">▾</summary>
+          <div class="zoom-options">
+            <button type="button" value="5">5%</button><button type="button" value="25">25%</button><button type="button" value="50">50%</button>
+            <button type="button" value="75">75%</button><button type="button" value="100">100%</button><button type="button" value="150">150%</button>
+            <button type="button" value="200">200%</button><button type="button" value="300">300%</button><button type="button" value="400">400%</button>
+            <button type="button" value="800">800%</button><button type="button" value="single">单页</button><button type="button" value="spread">双页</button>
+          </div>
+        </details></div><button id="zoom-in" aria-label="放大">＋</button>
+        <button id="fit">适应页面</button><button id="help" title="入门使用" aria-label="入门使用">?</button>
+      </footer>
+    </main>
+  </div>
+  <div id="print-output" aria-hidden="true"></div>
+  <div id="manual-print-output" aria-hidden="true"></div>
+  <div hidden><button id="lane-add" type="button"></button><button id="side-add" type="button"></button></div>
+  <dialog id="export-pages" class="settings-dialog">
+    <form>
+      <h2>导出</h2>
+      <label>谱本<select id="sheet-source"><option value="">总谱</option></select></label>
+      <label>格式<select id="sheet-format"><option value="pdf">PDF / 打印</option><option value="png">PNG 图片</option><option value="svg">SVG 矢量</option><option value="musicxml">MusicXML</option></select></label>
+      <label id="sheet-range-row">页范围<input id="sheet-range" placeholder="留空为全部，例如 1, 3-5"></label>
+      <label id="sheet-dpi-row">分辨率<select id="sheet-dpi"><option>150</option><option selected>300</option><option>600</option></select></label>
+      <label id="sheet-background-row" class="check-option"><input id="sheet-transparent" type="checkbox">透明背景</label>
+      <output id="sheet-export-status" role="status"></output>
+      <div class="buttons"><button id="sheet-export-cancel" type="button">关闭</button><button id="sheet-export-save" class="primary" type="submit">导出</button></div>
+    </form>
+  </dialog>
+  <div id="context-menu" role="menu" aria-label="谱面操作" hidden></div>
+  <dialog id="voice-conversion" class="settings-dialog">
+    <form method="dialog">
+      <h2 id="voice-conversion-title"></h2><p id="voice-conversion-summary"></p>
+      <div class="buttons"><button value="cancel">取消</button><button id="voice-conversion-apply" value="apply">转换</button></div>
+    </form>
+  </dialog>
+  <dialog id="measure-dialog" class="settings-dialog">
+    <form>
+      <div class="measure-dialog-heading"><h2 id="bar-heading">小节属性</h2>
+        <div class="buttons" aria-label="切换小节或声部">
+          <button type="button" id="bar-prev" aria-label="上一小节" title="上一小节">◀</button>
+          <button type="button" id="bar-next" aria-label="下一小节" title="下一小节">▶</button>
+          <button type="button" id="bar-up" aria-label="上一声部" title="上一声部">▲</button>
+          <button type="button" id="bar-down" aria-label="下一声部" title="下一声部">▼</button>
+        </div>
+      </div>
+      <p id="bar-location" class="layout-help"></p>
+      <div class="measure-modules">
+        <fieldset><legend>调号与谱面拍号</legend>
+          <div class="row">
+            <label>唱名基准<select id="bar-key-degree"><option value="1">1=…</option><option value="6">6=…</option></select></label>
+            <label>调号<select id="bar-key-fifths"></select></label>
+          </div>
+          <div id="bar-printed-fields" class="row"></div>
+          <p class="layout-help">调号和谱面拍号改动将印在本小节开头，只应用于本小节。</p>
+        </fieldset>
+        <fieldset><legend>实际拍号</legend>
+          <label>实际长度<select id="bar-actual-mode"><option value="keep">保持目前实际长度</option><option value="printed">跟随谱面拍号</option><option value="custom">自定义实际拍号</option></select></label>
+          <div id="bar-actual-fields" class="row"></div>
+          <label class="check-option"><input id="bar-pickup" type="checkbox">弱起（沿用谱面拍号的尾部拍位）</label>
+          <label>缩短后遇到已有音乐<select id="bar-overflow"><option value="keep">保留音乐并另划小节</option><option value="cut">移除缩短的拍位</option></select></label>
+          <p id="bar-duration-preview" class="layout-help"></p>
+        </fieldset>
+        <fieldset><legend>小节号</legend>
+          <div class="row">
+            <label>显示<select id="bar-number-display"><option value="auto">自动</option><option value="show">常显</option><option value="hide">常隐</option></select></label>
+            <label>本小节相对前一小节的编号增量<input id="bar-number-step" type="number" step="1" required></label>
+          </div>
+          <label class="check-option"><input id="bar-uncounted" type="checkbox">不计入小节号序数</label>
+          <p id="bar-number-preview" class="layout-help"></p>
+        </fieldset>
+        <fieldset><legend>本声部高亮（随 PDF 导出）</legend>
+          <label class="check-option"><input id="bar-highlight" type="checkbox">高亮本小节</label>
+          <div class="row">
+            <label>颜色<input id="bar-highlight-color" type="color" value="#f4ca52"></label>
+            <label>透明度（%）<input id="bar-highlight-opacity" type="number" min="0" max="100" value="72" required></label>
+          </div>
+        </fieldset>
+      </div>
+      <p id="bar-error" class="layout-help" role="alert"></p>
+      <div class="buttons"><button id="bar-delete" type="button">删除本小节</button><button id="bar-cancel" type="button">取消</button><button class="primary" type="submit">应用</button></div>
+    </form>
+  </dialog>
+  <dialog id="meter-dialog" class="settings-dialog">
+    <form method="dialog">
+      <h2 id="meter-heading">小节与拍号</h2>
+      <fieldset><legend>谱面拍号</legend>
+        <div class="row"><label>分子<input id="meter-top" type="number" min="1" max="16" required></label>
+        <label>分母<select id="meter-base"><option>2</option><option>4</option><option>8</option><option>16</option></select></label>
+        <label>拍组<input id="meter-groups" placeholder="例如 2+2+3"></label></div>
+        <label>应用范围<select id="meter-scope"><option value="following">延续到下一个变拍处</option><option value="one">仅本小节</option><option value="range">当前选区</option></select></label>
+      </fieldset>
+      <fieldset><legend>实际拍号</legend>
+        <label class="check-option"><input id="actual-inherit" type="checkbox">沿用谱面拍号</label>
+        <div class="row"><label>分子<input id="actual-top" type="number" min="1" max="16" required></label>
+        <label>分母<select id="actual-base"><option>2</option><option>4</option><option>8</option><option>16</option></select></label>
+        <label>拍组<input id="actual-groups" placeholder="例如 2+3"></label></div>
+        <label class="check-option"><input id="actual-pickup" type="checkbox">弱起（沿用谱面拍号的尾部拍位）</label>
+      </fieldset>
+      <label>缩短后遇到已有音乐<select id="meter-overflow"><option value="keep">保留音乐并另划小节</option><option value="cut">移除缩短的拍位</option></select></label>
+      <p id="meter-preview" class="layout-help" aria-live="polite"></p>
+      <div class="buttons"><button value="cancel" formnovalidate>取消</button><button value="apply" class="primary">应用</button></div>
+    </form>
+  </dialog>
+  <dialog id="key-dialog" class="settings-dialog">
+    <form method="dialog">
+      <h2>调号</h2>
+      <label>记谱基准<select id="key-degree"><option value="1" >1=…</option><option value="6" >6=…</option></select></label>
+      <label>调号<select id="key-fifths"></select></label>
+      <label class="check-option"><input id="key-only" type="checkbox">仅本小节</label>
+      <label>音高处理<select id="key-sound"><option value="keep">保留实际音高</option><option value="transpose">保留唱名并移调</option></select></label>
+      <div class="buttons"><button value="cancel">取消</button><button value="apply" class="primary">应用</button></div>
+    </form>
+  </dialog>
+  <dialog id="voice-dialog" class="settings-dialog">
+    <form method="dialog">
+      <h2>声部设置</h2>
+      <div id="voice-settings"></div>
+      <button id="voice-add-draft" type="button">添加声部</button>
+      <div class="buttons"><button value="cancel" formnovalidate>取消</button><button value="apply" class="primary">应用</button></div>
+    </form>
+  </dialog>
+  <dialog id="swap-voice-dialog" class="settings-dialog">
+    <form method="dialog">
+      <h2>自定义交换声部</h2>
+      <div class="row swap-voice-fields">交换 <input id="swap-voice-first" type="number" min="1" value="1" required aria-label="第一个声部编号" autofocus>、<input id="swap-voice-second" type="number" min="1" value="2" required aria-label="第二个声部编号">声部</div>
+      <div class="buttons"><button value="cancel" formnovalidate>取消</button><button value="apply" class="primary">交换</button></div>
+    </form>
+  </dialog>
+  <dialog id="lyric-preview-dialog" class="settings-dialog">
+    <form>
+      <h2>歌词配位预览</h2>
+      <p id="lyric-map-location" class="layout-help"></p>
+      <label>填入第几行歌词<input type="number" id="lyric-map-verse" min="1" max="20" required></label>
+      <label>歌词<textarea id="lyric-map-text" rows="4" maxlength="6000" placeholder="输入一段歌词，汉字自动占一个唱位，英文用空格或连字符分开" autofocus></textarea></label>
+      <p id="lyric-map-summary" class="layout-help" aria-live="polite"></p>
+      <div id="lyric-map-cells"></div>
+      <div class="buttons"><button id="lyric-map-close" type="button">取消</button><button id="lyric-map-apply" class="primary" type="submit">填写歌词</button></div>
+    </form>
+  </dialog>
+  <dialog id="parts-dialog" class="settings-dialog">
+    <h2>关联分谱</h2>
+    <div class="parts-workspace">
+      <form id="part-editor">
+        <div class="style-scope"><label>谱本<select id="part-list"></select></label><button id="part-new" type="button">新建分谱</button></div>
+        <fieldset><legend>名称与声部</legend>
+          <label>分谱名<input id="part-name" required maxlength="80"></label>
+          <div id="part-lanes"></div>
+          <label class="check-option"><input id="part-show-names" type="checkbox">显示声部名称</label>
+          <label class="check-option"><input id="part-show-lyrics" type="checkbox">显示歌词</label>
+          <label class="check-option"><input id="part-show-dynamics" type="checkbox">显示力度与渐强渐弱记号</label>
+        </fieldset>
+        <fieldset><legend>独立版面</legend>
+          <label>谱面大小（%）<input id="part-scale" type="number" min="25" max="300" placeholder="沿用总谱"></label>
+          <label>每行小节数<input id="part-count" type="number" min="1" max="600" placeholder="按页宽自动安排"></label>
+          <label class="check-option"><input id="part-use-master-breaks" type="checkbox">沿用总谱手动换行和换页</label>
+          <label>在这些小节前换行<input id="part-line-breaks" placeholder="例如 4, 8"></label>
+          <label>在这些小节前换页<input id="part-page-breaks" placeholder="例如 16"></label>
+          <p class="layout-help">按实际出现顺序填写，从 1 开始，弱起也计入。</p>
+        </fieldset>
+        <p id="part-error" class="layout-help" role="alert"></p>
+        <div class="buttons"><button id="part-delete" type="button">删除分谱</button><button class="primary" type="submit">保存分谱设置</button></div>
+      </form>
+      <div class="part-preview-frame"><div id="part-preview"></div></div>
+    </div>
+    <div class="buttons"><button id="part-close" type="button">关闭</button><button id="part-independent" type="button">另存为独立谱…</button>
+      <button id="part-export-xml" type="button">导出 MusicXML…</button><button id="part-export" type="button">导出本分谱…</button>
+      <button id="part-open" type="button" class="primary">打开分谱</button></div>
+  </dialog>
+
+
+  <dialog id="navigation-dialog" class="settings-dialog">
+    <h2>小节导航与校对</h2>
+    <form id="nav-search-form" class="row">
+      <label>按谱面小节号查找<input id="nav-search" type="search" placeholder="例如 20" autofocus></label>
+      <button type="submit">跳转</button>
+    </form>
+    <label>显示<select id="nav-kind"><option value="all">全部</option><option value="outline">调号、拍号与排练标记</option><option value="issue">校对提示</option></select></label>
+    <button id="nav-play-order" type="button">查看实际演奏顺序</button>
+    <div id="nav-order" class="layout-help" hidden></div>
+    <p id="nav-summary" class="layout-help" aria-live="polite"></p>
+    <div id="nav-results"></div>
+    <form method="dialog" class="buttons"><button>关闭</button></form>
+  </dialog>
+  <dialog id="line-dialog" class="settings-dialog">
+    <form>
+      <h2>换行规则</h2>
+      <fieldset><legend>自动换行</legend>
+        <label class="check-option"><input id="line-rule-enabled" type="checkbox">启用固定间隔换行</label>
+        <div id="line-rule-settings">
+          <div class="row">
+            <label>从第几小节开始<input id="line-rule-start" type="number" step="1" required></label>
+            <label>每行小节数<input id="line-rule-count" type="number" min="1" max="600" step="1" required></label>
+          </div>
+          <label>计数依据<select id="line-rule-by"><option value="position">实际小节数（从 1 开始）</option><option value="number">谱面小节号</option></select></label>
+          <label>提前换行后<select id="line-rule-overflow"><option value="continue">沿用原有换行位置</option><option value="restart">从下一行开头重新计数</option></select></label>
+          <p class="layout-help">按谱面号计数时，只比较整数编号，重复编号取第一次。跳过预定换行号时，在随后第一个符合条件的小节前换行。</p>
+        </div>
+      </fieldset>
+      <p class="layout-help">手动换行、换页和锁行优先。锁定一个选段会把该范围排在一行。</p>
+      <div class="buttons"><button id="line-only-selection" type="button">按此间隔重排选段</button><button type="button" id="line-dialog-cancel">取消</button><button class="primary" type="submit">应用全谱</button></div>
+    </form>
+  </dialog>
+  <dialog id="format-dialog" class="settings-dialog">
+    <h2>样式</h2>
+    <div class="style-browser">
+      <div id="style-categories" role="tablist" aria-label="样式类别" aria-orientation="vertical">
+        <button type="button" role="tab" id="style-tab-paper" aria-selected="true" aria-controls="style-paper" autofocus>纸张与大小</button>
+        <button type="button" role="tab" id="style-tab-spacing" aria-selected="false" aria-controls="style-spacing" tabindex="-1">边距与间距</button>
+        <button type="button" role="tab" id="style-tab-folio" aria-selected="false" aria-controls="style-folio" tabindex="-1">页码</button>
+        <button type="button" role="tab" id="style-tab-measure" aria-selected="false" aria-controls="style-measure" tabindex="-1">小节号</button>
+        <button type="button" role="tab" id="style-tab-fonts" aria-selected="false" aria-controls="style-fonts" tabindex="-1">数字与文字</button>
+        <button type="button" role="tab" id="style-tab-lyrics" aria-selected="false" aria-controls="style-lyrics" tabindex="-1">歌词</button>
+        <button type="button" role="tab" id="style-tab-lines" aria-selected="false" aria-controls="style-lines" tabindex="-1">线条与括号</button>
+        <button type="button" role="tab" id="style-tab-grace" aria-selected="false" aria-controls="style-grace" tabindex="-1">倚音</button>
+      </div>
+      <div id="style-pages">
+        <section id="style-paper" role="tabpanel" aria-labelledby="style-tab-paper">
+          <h3>纸张与大小</h3>
+          <fieldset><legend>纸张</legend>
+            <div class="style-fields">
+              <label>规格<select id="paper-preset"><option value="a4">A4</option><option value="a5">A5</option><option value="b5">B5</option><option value="letter">Letter</option><option value="custom">自定义</option></select></label>
+              <label>方向<select id="paper-orientation"><option value="portrait">纵向</option><option value="landscape">横向</option><option value="square" hidden>正方形</option></select></label>
+              <label>宽度（毫米）<input id="paper-width" type="number" min="80" max="1200" step=".1"></label>
+              <label>高度（毫米）<input id="paper-height" type="number" min="80" max="1200" step=".1"></label>
+            </div>
+          </fieldset>
+          <fieldset><legend>谱面比例</legend>
+            <div class="style-fields"><label>全谱大小（%）<input id="score-scale" type="number" min="25" max="300" value="100" step="1"></label></div>
+            <p class="layout-help">缩放音符、文字和谱面间距。纸张尺寸与页边距独立设置。</p>
+          </fieldset>
+        </section>
+        <section id="style-spacing" role="tabpanel" aria-labelledby="style-tab-spacing" hidden>
+          <h3>边距与间距</h3>
+          <div class="style-scope">
+            <label>设置范围<select id="page-scope" aria-describedby="page-layout-help"><option value="0">全谱默认</option></select></label>
+            <button id="reset-spacing" type="button">恢复默认间距</button>
+          </div>
+          <p id="page-layout-help" class="layout-help">间距为最小值，各行自动撑满页宽。单页数值留空时沿用全谱。</p>
+          <fieldset><legend>页边距</legend><div id="spacing-margins" class="style-fields"></div></fieldset>
+          <fieldset><legend>横向间距</legend><div id="spacing-horizontal" class="style-fields"></div></fieldset>
+          <fieldset><legend>纵向间距</legend><div id="spacing-vertical" class="style-fields"></div></fieldset>
+          <fieldset><legend>页面分布</legend>
+            <div class="style-fields"><label>页底对齐<select id="bottom-alignment">
+              <option value="inherit">沿用全谱</option><option value="on">对齐下边界</option><option value="off">保持最小间距</option>
+            </select></label></div>
+          </fieldset>
+        </section>
+        <section id="style-folio" role="tabpanel" aria-labelledby="style-tab-folio" hidden>
+          <h3>页码</h3>
+          <fieldset><legend>显示</legend>
+            <label class="check-option"><input id="folio-show" type="checkbox">显示页码</label>
+            <label class="check-option"><input id="folio-first" type="checkbox">首页也显示</label>
+          </fieldset>
+          <fieldset id="folio-placement"><legend>编号与位置</legend>
+            <div class="style-fields">
+              <label>起始编号<input id="folio-start" type="number" min="1" max="9999"></label>
+              <label>位置<select id="folio-position"><option value="bottom">页底</option><option value="top">页顶</option></select></label>
+              <label>对齐<select id="folio-align"><option value="center">居中</option><option value="outside">奇偶页外侧</option></select></label>
+            </div>
+          </fieldset>
+        </section>
+        <section id="style-measure" role="tabpanel" aria-labelledby="style-tab-measure" hidden>
+          <h3>小节号</h3>
+          <fieldset><legend>显示规则</legend>
+            <div class="style-fields"><label>全谱显示<select id="measure-number-mode"><option value="auto">自动</option><option value="hide">全隐</option></select></label></div>
+          </fieldset>
+          <div id="format-measure-number"></div>
+        </section>
+        <section id="style-fonts" role="tabpanel" aria-labelledby="style-tab-fonts" hidden>
+          <h3>数字与文字</h3>
+          <div id="format-fonts" class="style-font-groups"></div>
+        </section>
+        <section id="style-lyrics" role="tabpanel" aria-labelledby="style-tab-lyrics" hidden>
+          <h3>歌词</h3>
+          <div id="format-lyrics"></div>
+        </section>
+        <section id="style-lines" role="tabpanel" aria-labelledby="style-tab-lines" hidden>
+          <h3>线条与括号</h3>
+          <fieldset><legend>弧线与花括号</legend><div id="format-engraving" class="style-fields"></div></fieldset>
+          <fieldset><legend>渐强与渐弱</legend><div id="format-wedges" class="style-fields"></div></fieldset>
+        </section>
+        <section id="style-grace" role="tabpanel" aria-labelledby="style-tab-grace" hidden>
+          <h3>倚音</h3>
+          <fieldset><legend>横向间距</legend><div id="format-grace-spacing" class="style-fields"></div></fieldset>
+          <fieldset><legend>减时线与附点</legend><div id="format-grace-details" class="style-fields"></div></fieldset>
+        </section>
+      </div>
+    </div>
+    <form method="dialog" class="buttons style-actions"><div class="buttons"><button id="style-save" type="button">导出样式…</button><button id="style-load" type="button">应用样式…</button><input type="file" id="style-file" accept=".shupustyle,.json,.cjstyle" hidden></div><button class="primary">完成</button></form>
+  </dialog>
+  <dialog id="similar-dialog" class="settings-dialog">
+    <form method="dialog">
+      <h2>选择相似元素</h2>
+      <div id="similar-options"></div>
+      <output id="similar-count"></output>
+      <label>对当前选区<select id="similar-action"><option value="replace">替换</option><option value="add">添加</option><option value="subtract">扣除</option></select></label>
+      <div class="buttons"><button value="cancel">取消</button><button value="apply" class="primary">应用</button></div>
+    </form>
+  </dialog>
+  <dialog id="lyric-text-dialog" class="settings-dialog">
+    <form method="dialog">
+      <h2>复制歌词为纯文本</h2>
+      <label>预览<textarea id="lyric-text-preview" rows="9" readonly></textarea></label>
+      <div class="buttons"><button value="cancel">取消</button><button id="lyric-text-copy" type="button" class="primary">复制文本</button></div>
+    </form>
+  </dialog>
+  <dialog id="custom-tuplet">
+    <form method="dialog">
+      <h2>自定义多连音</h2>
+      <label>等分数<input id="tuplet-count" type="number" min="2" max="999" required autofocus></label>
+      <output id="tuplet-preview"></output>
+      <div class="buttons"><button value="cancel" formnovalidate>取消</button><button class="primary" value="add">创建</button></div>
+    </form>
+  </dialog>
+  <dialog id="add-text">
+    <form method="dialog">
+      <h2 id="add-text-title">添加文字</h2>
+      <label>内容<input id="add-text-value" maxlength="300" required autofocus></label>
+      <label id="add-text-side-row" hidden>位置<select id="add-text-side"><option value="left">音符左侧</option><option value="right">音符右侧</option></select></label>
+      <div class="buttons"><button value="cancel" formnovalidate>取消</button><button value="add" class="primary">添加</button></div>
+    </form>
+  </dialog>
+  <dialog id="mix-panel" aria-labelledby="mix-title">
+    <form method="dialog" class="mix-heading"><strong id="mix-title">混音台</strong><button aria-label="关闭混音台">关闭</button></form>
+    <p>可同时独听多个声部。临时副线跟随其所属声部。</p>
+    <div id="mix-channels"></div>
+  </dialog>
+  <dialog id="close-score">
+    <form method="dialog">
+      <h2>保存更改</h2><p id="close-score-name"></p>
+      <div class="buttons"><button value="cancel" autofocus>取消</button><button value="discard">放弃更改</button>
+        <button value="downloaded" id="close-score-confirm" hidden>已下载，关闭</button><button value="save" class="primary">保存</button></div>
+    </form>
+  </dialog>
+  <dialog id="setup">
+    <form>
+      <h2>新建乐谱</h2>
+      <div class="setup-grid">
+        <section>
+          <fieldset><legend>乐谱信息</legend>
+            <div class="row"><label>标题<input id="setup-title" maxlength="100" placeholder="未命名乐谱" autofocus></label>
+              <label>副标题<input id="setup-subtitle" maxlength="100"></label></div>
+            <div class="row"><label>作词<input id="setup-lyricist" maxlength="100"></label><label>作曲<input id="setup-composer" maxlength="100"></label></div>
+            <div class="row"><label>改编<input id="setup-arranger" maxlength="100"></label><label>版权<input id="setup-copyright" maxlength="100"></label></div>
+          </fieldset>
+          <fieldset><legend>声部</legend>
+            <label>快捷配置<select id="setup-voices"><option value="solo">独唱／独奏</option><option value="duet">二重唱</option><option>SA</option><option>TB</option><option>SATB</option><option value="piano">钢琴双声部</option><option value="custom">自定义</option></select></label>
+            <div id="setup-lanes"></div><button id="setup-add-lane" type="button">添加声部</button>
+          </fieldset>
+        </section>
+        <section>
+          <fieldset><legend>调号与拍号</legend>
+            <div class="row"><label>唱名基准<select id="setup-key-degree"><option value="1">1=…</option><option value="6">6=…</option></select></label><label>调号<select id="setup-key"></select></label></div>
+            <label>拍号预设<select id="setup-meter-preset"></select></label><div class="row" id="setup-printed"></div>
+          </fieldset>
+          <fieldset><legend>初始速度</legend>
+            <label>记号格式<select id="setup-tempo-kind"><option value="metronome">音符＝数字</option><option value="word">速度术语</option><option value="both">术语与数字速度</option></select></label>
+            <label id="setup-word-row">速度术语<select id="setup-tempo-word"></select></label>
+            <div id="setup-metronome-row" class="row"><label>时值<select id="setup-tempo-unit"></select></label><label>速度<input id="setup-bpm" type="number" min="1" max="600" value="88" required></label></div>
+            <label class="check-option"><input id="setup-print-tempo" type="checkbox" checked>谱面显示速度</label>
+          </fieldset>
+          <fieldset><legend>小节</legend>
+            <div class="row setup-measure-row">
+              <label>小节总数（含弱起）<input id="setup-count" type="number" min="1" max="600" value="32" required></label>
+              <label class="check-option"><input id="setup-pickup" type="checkbox">弱起小节</label>
+            </div>
+            <div id="setup-pickup-row" hidden><div class="row" id="setup-actual"></div>
+              <label class="check-option"><input id="setup-complement" type="checkbox">末小节扣除弱起时值</label>
+            </div>
+          </fieldset>
+        </section>
+      </div>
+      <p id="setup-error" role="alert" class="layout-help"></p>
+      <div class="buttons"><button type="button" id="setup-cancel">取消</button><button type="submit" class="primary">创建</button></div>
+    </form>
+  </dialog>
+  <dialog id="import-review">
+    <form method="dialog">
+      <h2>导入乐谱</h2>
+      <p id="import-info"></p>
+      <label class="check-option"><input id="import-beams" type="checkbox">保留原 MusicXML 的符杠分组</label>
+      <label>选择要导入的声部</label>
+      <div id="import-parts"></div>
+      <details id="import-warnings"><summary id="import-warning-count">导入提示</summary><ul id="import-warning-list"></ul></details>
+      <div class="buttons"><button value="cancel">取消</button><button value="import" class="primary">导入所选声部</button></div>
+    </form>
+  </dialog>
+  <dialog id="export-review">
+    <form method="dialog">
+      <h2>导出 MusicXML</h2>
+      <p>交换音高、时值、声部与记号。MuseScore 会按五线谱显示；简谱工程和 PDF 不受影响。</p>
+      <ul id="export-notices"></ul>
+      <div class="buttons"><button value="cancel">取消</button><button value="download" class="primary">下载 .musicxml</button></div>
+    </form>
+  </dialog>
+  <dialog id="about">
+    <form method="dialog">
+      <h2>关于</h2>
+      <h3>数谱 | 简谱工作台</h3>
+      <p>版本 1.0</p>
+      <p>一款自由的简谱制谱、编辑、排版、试听工具。着重处理多声部乐谱制作，谱面万物皆元素，元素可自由移动，属性可自由设定。</p>
+      <p><strong>开发者</strong>　赵冠乔<br><strong>联系邮箱</strong>　<a href="mailto:zhaoguanqiao789@163.com">zhaoguanqiao789@163.com</a></p>
+      <p><strong>软件版权</strong>　Copyright © 2026 赵冠乔<br><strong>软件许可</strong>　<a href="https://www.apache.org/licenses/LICENSE-2.0">Apache License 2.0</a><br><strong>内置示例谱《四季流转》版权</strong>　© 2026 赵冠乔</p>
+      <p>随软件提供的示例谱不适用软件源码许可证。</p>
+      <p>本产品由OpenAI Codex辅助开发。</p>
+      <div class="buttons"><button class="primary">关闭</button></div>
+    </form>
+  </dialog>
+  <dialog id="guide">
+    <form method="dialog">
+      <h2>入门使用</h2>
+      <div id="guide-content" class="help-prose"></div>
+      <button class="primary">返回谱面</button>
+    </form>
+  </dialog>
+  <dialog id="manual">
+    <div class="manual-heading" data-dialog-heading>
+      <h2>功能手册</h2>
+      <button id="manual-toggle-outline" aria-controls="manual-nav" aria-expanded="true" type="button">大纲</button>
+      <div class="manual-search">
+        <input id="manual-search" type="text" placeholder="搜索手册全文" aria-label="搜索手册全文" autocomplete="off">
+        <button type="button" id="manual-clear-search" aria-label="清除搜索" title="清除搜索" hidden>×</button>
+      </div>
+      <span id="manual-search-count" role="status"></span>
+    </div>
+    <div id="manual-workspace" class="manual-workspace">
+      <nav id="manual-nav" aria-label="手册大纲"></nav>
+      <div class="manual-reading">
+        <div class="help-prose" id="manual-body" tabindex="0" aria-label="手册正文"></div>
+        <div id="manual-rail" class="manual-rail" aria-label="搜索命中的文档位置" hidden></div>
+      </div>
+    </div>
+    <form method="dialog" class="buttons">
+      <button id="manual-markdown" type="button">导出 Markdown</button>
+      <button id="manual-pdf" type="button">导出 PDF…</button>
+      <button class="primary">关闭</button>
+    </form>
+  </dialog>
+  <dialog id="preferences-dialog" class="settings-dialog">
+    <form>
+      <h2>偏好设置</h2>
+      <div id="preference-groups"></div>
+      <p id="preference-status" role="status"></p>
+      <input id="preference-file" type="file" accept=".shupuprefer,.json" hidden>
+      <div class="buttons">
+        <button id="preference-reset" type="button">恢复默认</button>
+        <button id="preference-import" type="button">导入…</button>
+        <button id="preference-export" type="button">导出…</button>
+        <button id="preference-cancel" type="button">取消</button>
+        <button type="submit" class="primary">应用</button>
+      </div>
+    </form>
+  </dialog>
+  <dialog id="shortcut-settings">
+    <form method="dialog">
+      <h2>快捷键设置</h2>
+      <div class="shortcut-filters">
+        <label>搜索功能或按键<input id="shortcut-query" type="search" autocomplete="off" autofocus></label>
+        <label class="check-option"><input id="shortcut-conflicts" type="checkbox">只看冲突</label>
+      </div>
+      <div class="row" id="shortcut-capture-row" hidden>
+        <label><span id="shortcut-capture-name"></span><input id="shortcut-capture" readonly placeholder="请按下要绑定的组合键"></label>
+        <button id="shortcut-capture-cancel" type="button">取消录入</button>
+      </div>
+      <div class="shortcut-scroll" tabindex="0" aria-label="快捷键表格">
+        <table>
+          <thead><tr><th scope="col">功能</th><th scope="col">适用情境</th><th scope="col">快捷键</th><th scope="col">操作</th></tr></thead>
+          <tbody id="shortcut-rows"></tbody>
+        </table>
+        <p id="shortcut-empty" hidden>没有匹配的功能。</p>
+      </div>
+      <div id="shortcut-import-preview" hidden>
+        <p id="shortcut-import-summary"></p>
+        <button type="button" id="shortcut-import-merge">合并</button>
+        <button type="button" id="shortcut-import-replace">替换</button>
+      </div>
+      <p id="shortcut-message" class="layout-help" role="status"></p>
+      <div class="buttons shortcut-actions">
+        <button type="button" id="shortcut-reset">全部恢复默认</button>
+        <button type="button" id="shortcut-import">导入…</button>
+        <button type="button" id="shortcut-export">导出…</button>
+        <input type="file" id="shortcut-file" accept=".shupuskeys,.json" hidden>
+        <button value="cancel">取消</button><button type="button" id="shortcut-apply" class="primary">应用</button>
+      </div>
+    </form>
+  </dialog>
+</body>
+</html>

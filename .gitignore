@@ -1,0 +1,8 @@
+node_modules/
+dist/
+.npm-cache/
+.preview-profile/
+output/
+/数谱-简谱工作台-1.0.html
+*.shupu
+*.jianpu.json
